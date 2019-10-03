@@ -118,7 +118,7 @@ public class Drive extends OpMode {
         microPolMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         microPolMotor.setTargetPosition(0);
         microPolMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        microPolMotor.setPower(0.8);
+        microPolMotor.setPower(1);
         //TODO: Test default targetPositionTolerance
         microPolMotor.setTargetPositionTolerance(4);
 
