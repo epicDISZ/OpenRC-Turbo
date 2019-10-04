@@ -20,9 +20,11 @@ DONE: Fix servo delayed start
 DONE: Fix straight drive for all modes
 TODO: Lift Height For lvl 2
 DONE: Automatic servo for Micro
-TODO: Automatic shooting for Macro
+DONE: Automatic shooting for Macro
+TODO: Possible small changes to syntax for Macro
 DONE: Start lift at height of 33
 TODO: Adjust servo open time in micro pol system
+TODO: Fix buttons for gamepad2
  */
 
 @TeleOp(name="Drive", group="Drive")
