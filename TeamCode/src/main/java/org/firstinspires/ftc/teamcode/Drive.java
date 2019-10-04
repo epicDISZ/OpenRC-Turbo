@@ -22,6 +22,7 @@ TODO: Lift Height For lvl 2
 DONE: Automatic servo for Micro
 TODO: Automatic shooting for Macro
 DONE: Start lift at height of 33
+TODO: Adjust servo open time in micro pol system
  */
 
 @TeleOp(name="Drive", group="Drive")
