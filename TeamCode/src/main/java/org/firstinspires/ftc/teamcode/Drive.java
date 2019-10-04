@@ -212,7 +212,7 @@ public class Drive extends OpMode {
                     microState = microState.Idle;
                 break;
             case Shooting:
-                if (microPolMotor.getTargetPosition() - (ticksPerMicroRev / 2) - (ticksPerMicroRev / 8) < microPolMotor.getCurrentPosition()) {
+                if (microPolMotor.getTargetPosition() - ((ticksPerMicroRev / 4) * 3) < microPolMotor.getCurrentPosition()) {
                     microPolMotor.setTargetPosition(microPolMotor.getTargetPosition());
                     microState = MicroState.Idle;
                 }
