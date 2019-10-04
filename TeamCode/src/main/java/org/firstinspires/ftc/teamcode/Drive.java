@@ -39,6 +39,7 @@ public class Drive extends OpMode {
     private final double upperLiftBound = 36.3;
     private final double liftLockHeight = 20.9;
     private final double startLiftHeight = 32.5;
+    private final int ticksForLoad = 1120;
 
     //Variables
     private double driveSpeed;
@@ -50,6 +51,7 @@ public class Drive extends OpMode {
     //Robot States
     private DriveState driveState;
     private MicroState microState;
+    private MacroState macroState;
 
     //Robot Hardware
     private DcMotorEx rightMotor;
@@ -64,7 +66,8 @@ public class Drive extends OpMode {
     private Servo macroTrigger;
     private Servo microGate;
 
-    private ElapsedTime roboRuntime = new ElapsedTime();
+    private ElapsedTime microRuntime = new ElapsedTime();
+    private ElapsedTime macroRuntime = new ElapsedTime();
 
     private Rev2mDistanceSensor liftDistanceSensor;
     private ColorSensor microColorSensor;
@@ -74,16 +77,18 @@ public class Drive extends OpMode {
     //Telemetry
     Telemetry.Item teleSpeed;
     Telemetry.Item teleMicroState;
+    Telemetry.Item teleMacroState;
     Telemetry.Item teleLiftHeight;
 
     @Override
     public void init() {
-        driveState = driveState.Normal;
+        driveState = DriveState.Normal;
         driveSpeed = normalSpeed;
         constIntake = false;
         straightDrive = false;
         liftAtStart = false;
         microState = MicroState.Idle;
+        macroState = MacroState.Idle;
 
         //Initialize all motors and Servos
         rightMotor = hardwareMap.get(DcMotorEx.class, "RightMotor");
@@ -117,11 +122,16 @@ public class Drive extends OpMode {
         liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         microPolMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        macroPolMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         microPolMotor.setTargetPosition(0);
+        macroPolMotor.setTargetPosition(0);
         microPolMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        macroPolMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         microPolMotor.setPower(1);
+        macroPolMotor.setPower(1);
         //TODO: Test default targetPositionTolerance
         microPolMotor.setTargetPositionTolerance(4);
+        macroPolMotor.setTargetPositionTolerance(4);
 
         //Initialize Servos
         liftLock.setPosition(0);
@@ -130,6 +140,7 @@ public class Drive extends OpMode {
         //Initialize Telemetry
         teleSpeed = telemetry.addData("Drive Speed", driveSpeed);
         teleMicroState = telemetry.addData("Micro Pol State", microState);
+        teleMacroState = telemetry.addData("Macro Pol State", macroState);
         teleLiftHeight = telemetry.addData("Lift Height", liftHeight);
     }
 
@@ -147,7 +158,7 @@ public class Drive extends OpMode {
 
         //Sets Drive Speed Based on driveState
         driveSpeed = (driveState == DriveState.Slow) ? slowSpeed :
-                (driveState == DriveState.Fast) ? fastSpeed : normalSpeed;
+                        (driveState == DriveState.Fast) ? fastSpeed : normalSpeed;
         if (straightDrive)
             setMotor(-gamepad1.left_stick_y, -gamepad1.left_stick_y, driveSpeed);  //Temp code
         else
@@ -194,13 +205,13 @@ public class Drive extends OpMode {
             case StartFeed:
                 microGate.setPosition(0.26);
                 microState = MicroState.Feeding;
-                roboRuntime.reset();
+                microRuntime.reset();
                 break;
             case Feeding:
-                if (360 < roboRuntime.milliseconds()) {
+                if (360 < microRuntime.milliseconds()) {
                     microGate.setPosition(0.1);
                     microState = MicroState.StartShoot;
-                    roboRuntime.reset();
+                    microRuntime.reset();
                 }
                 break;
             case StartShoot:
@@ -209,7 +220,7 @@ public class Drive extends OpMode {
                     microPolMotor.setTargetPosition(microPolMotor.getTargetPosition() + ticksPerMicroRev); //Change to target position to allow feeding before shooting has finished
                     microState = MicroState.Shooting;
                 }
-                else if (3000 < roboRuntime.milliseconds())
+                else if (3000 < microRuntime.milliseconds())
                     microState = microState.Idle;
                 break;
             case Shooting:
@@ -221,16 +232,54 @@ public class Drive extends OpMode {
             default: microState = MicroState.Idle; break;
         }
 
-        if (macroMagLimit.isPressed())
+        //TODO: Check position of macroMotor when shooting.
+
+        switch (macroState) {
+            case Idle:
+//                if (gamepad2.a)
+//                    macroState = MacroState.StartLoading;
+                macroState = (gamepad2.y) ? MacroState.StartLoading : macroState;
+                break;
+            case StartLoading:
+                macroPolMotor.setTargetPosition(ticksForLoad + 250);
+                macroState = MacroState.Loading;
+                break;
+            case Loading:
+                if (ticksForLoad < macroPolMotor.getCurrentPosition())
+                    macroState = MacroState.StartLock;
+                break;
+            case StartLock:
+                macroTrigger.setPosition(0.75);
+                macroState = MacroState.Locked;
+                macroRuntime.reset();
+                break;
+            case Locked:
+                if (700 < macroRuntime.milliseconds()) {
+                    macroPolMotor.setTargetPosition(0);
+                    macroState = MacroState.LockedAndLoaded;
+                }
+                break;
+            case LockedAndLoaded:
+                if ((gamepad2.right_stick_button && gamepad2.left_stick_button) && macroPolMotor.getCurrentPosition() < 10)
+                    macroState = MacroState.Shoot;
+                break;
+            case Shoot:
+                macroTrigger.setPosition(0);
+                macroState = MacroState.Idle;
+                break;
+            default: macroState = MacroState.Idle; break;
+        }
+
+        /*if (macroMagLimit.isPressed())
             macroTrigger.setPosition(0.7);
         if (gamepad2.left_stick_button && gamepad2.right_stick_button)
-            macroTrigger.setPosition(0);
+            macroTrigger.setPosition(0);*/
 
-        if (gamepad2.right_bumper)
+        /*if (gamepad2.right_bumper)
             macroPolMotor.setPower(1);
         else if (gamepad2.left_bumper)
             macroPolMotor.setPower(-1);
-        else macroPolMotor.setPower(0);
+        else macroPolMotor.setPower(0);*/
 
         if (gamepad2.dpad_down)
             microGate.setPosition(0.1);
@@ -244,6 +293,7 @@ public class Drive extends OpMode {
 
         teleSpeed.setValue(driveSpeed);
         teleMicroState.setValue(microState);
+        teleMacroState.setValue(macroState);
         teleLiftHeight.setValue(liftHeight);
         telemetry.update();
     }
@@ -281,6 +331,16 @@ public class Drive extends OpMode {
         Feeding,
         StartShoot,
         Shooting
+    }
+
+    public enum MacroState {
+        Idle,
+        StartLoading,
+        Loading,
+        StartLock,
+        Locked,
+        LockedAndLoaded,
+        Shoot
     }
 }
 
