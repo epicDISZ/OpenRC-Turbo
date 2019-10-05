@@ -18,7 +18,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 /*
 DONE: Fix servo delayed start
 DONE: Fix straight drive for all modes
-TODO: Lift Height For lvl 2
+DONE: Lift Height For lvl 2
 DONE: Automatic servo for Micro
 DONE: Automatic shooting for Macro
 TODO: Possible small changes to syntax for Macro
@@ -49,6 +49,7 @@ public class Drive extends OpMode {
     private boolean constIntake;
     private boolean straightDrive;
     private boolean liftAtStart;
+    private boolean manualShoot;
 
     //Robot States
     private DriveState driveState;
@@ -89,6 +90,7 @@ public class Drive extends OpMode {
         constIntake = false;
         straightDrive = false;
         liftAtStart = false;
+        manualShoot = false;
         microState = MicroState.Idle;
         macroState = MacroState.Idle;
 
@@ -147,6 +149,12 @@ public class Drive extends OpMode {
     }
 
     @Override
+    public void start() {
+        super.start();
+        constIntake = true;
+    }
+
+    @Override
     public void loop() {
         if (gamepad1.right_trigger)
             driveState = DriveState.Slow;
@@ -198,6 +206,8 @@ public class Drive extends OpMode {
             if (gamepad2.x)
                 liftLock.setPosition(0);
         }
+        if (gamepad2.left_stick_button)
+            liftAtStart = false;
 
         switch (microState) {
             case Idle:
@@ -210,7 +220,7 @@ public class Drive extends OpMode {
                 microRuntime.reset();
                 break;
             case Feeding:
-                if (360 < microRuntime.milliseconds()) {
+                if (305 < microRuntime.milliseconds()) {
                     microGate.setPosition(0.1);
                     microState = MicroState.StartShoot;
                     microRuntime.reset();
@@ -262,7 +272,7 @@ public class Drive extends OpMode {
                 }
                 break;
             case LockedAndLoaded:
-                if ((gamepad2.right_stick_button && gamepad2.left_stick_button) && macroPolMotor.getCurrentPosition() < 10)
+                if ((gamepad2.b) && macroPolMotor.getCurrentPosition() < 15)
                     macroState = MacroState.Shoot;
                 break;
             case Shoot:
@@ -288,10 +298,14 @@ public class Drive extends OpMode {
         else if (gamepad2.dpad_up)
             microGate.setPosition(0.26);
 
-        if (gamepad2.dpad_up)
-            microPolMotor.setTargetPosition(microPolMotor.getCurrentPosition() + 10);
-        else if (gamepad2.dpad_up)
-            microPolMotor.setTargetPosition(microPolMotor.getCurrentPosition() - 10);
+        if (gamepad2.right_trigger && !manualShoot) {
+            microPolMotor.setTargetPosition(microPolMotor.getCurrentPosition() + ticksPerMicroRev);
+        }
+        else if (manualShoot){
+            if (microPolMotor.getTargetPosition() - 20 < microPolMotor.getCurrentPosition()) {
+                manualShoot = false;
+            }
+        }
 
         teleSpeed.setValue(driveSpeed);
         teleMicroState.setValue(microState);
