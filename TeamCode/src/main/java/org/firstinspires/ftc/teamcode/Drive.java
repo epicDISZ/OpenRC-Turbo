@@ -40,7 +40,7 @@ public class Drive extends OpMode {
     private final double lowerLiftBound = 9;
     private final double upperLiftBound = 36.3;
     private final double liftLockHeight = 20.9;
-    private final double startLiftHeight = 32.5;
+    private final double startLiftHeight = 32;
     private final int ticksForLoad = 1120;
 
     //Variables
