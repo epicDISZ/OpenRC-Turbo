@@ -23,7 +23,7 @@ DONE: Automatic servo for Micro
 DONE: Automatic shooting for Macro
 TODO: Possible small changes to syntax for Macro
 DONE: Start lift at height of 33
-TODO: Adjust servo open time in micro pol system
+TODO-DONE: Adjust servo open time in micro pol system
 TODO: Fix buttons for gamepad2
  */
 
@@ -112,9 +112,10 @@ public class Drive extends OpMode {
         microDistanceSensor = hardwareMap.get(DistanceSensor.class, "MicroColorSensor");
         macroMagLimit = hardwareMap.get(TouchSensor.class, "MacroMagLimit");
         //TODO: Add reverses
-        rightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        forRight.setDirection(DcMotorSimple.Direction.REVERSE);
-        microPolMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightMotor.setDirection(DcMotor.Direction.REVERSE);
+        forRight.setDirection(DcMotor.Direction.REVERSE);
+        microPolMotor.setDirection(DcMotor.Direction.REVERSE);
+        intakeMotor.setDirection(DcMotor.Direction.REVERSE);
         //TODO: Add brake button
         rightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         forRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -299,10 +300,10 @@ public class Drive extends OpMode {
             microGate.setPosition(0.26);
 
         if (gamepad2.right_trigger && !manualShoot) {
-            microPolMotor.setTargetPosition(microPolMotor.getCurrentPosition() + ticksPerMicroRev);
+            microPolMotor.setTargetPosition(microPolMotor.getTargetPosition() + ticksPerMicroRev);
         }
         else if (manualShoot){
-            if (microPolMotor.getTargetPosition() - 20 < microPolMotor.getCurrentPosition()) {
+            if (microPolMotor.getTargetPosition() - 10 < microPolMotor.getCurrentPosition()) {
                 manualShoot = false;
             }
         }
