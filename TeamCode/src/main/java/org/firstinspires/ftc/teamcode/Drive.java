@@ -25,6 +25,7 @@ TODO: Possible small changes to syntax for Macro
 DONE: Start lift at height of 33
 TODO-DONE: Adjust servo open time in micro pol system
 TODO: Fix buttons for gamepad2
+TODO: Long press (~300ms) for lift start height
  */
 
 @TeleOp(name="Drive", group="Drive")
