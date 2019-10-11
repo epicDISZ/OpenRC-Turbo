@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
@@ -26,6 +25,7 @@ DONE: Start lift at height of 33
 TODO-DONE: Adjust servo open time in micro pol system
 TODO: Fix buttons for gamepad2
 TODO: Long press (~300ms) for lift start height
+TODO: Change buttons from A/B to something else.
  */
 
 @TeleOp(name="Drive", group="Drive")
@@ -41,7 +41,7 @@ public class Drive extends OpMode {
     private final double lowerLiftBound = 9;
     private final double upperLiftBound = 36.3;
     private final double liftLockHeight = 20.9;
-    private final double startLiftHeight = 32;
+    private final double targetLiftHeight = 32;
     private final int ticksForLoad = 1120;
 
     //Variables
@@ -49,7 +49,7 @@ public class Drive extends OpMode {
     private double liftHeight;
     private boolean constIntake;
     private boolean straightDrive;
-    private boolean liftAtStart;
+    private boolean liftAtHeight;
     private boolean manualShoot;
 
     //Robot States
@@ -90,7 +90,7 @@ public class Drive extends OpMode {
         driveSpeed = normalSpeed;
         constIntake = false;
         straightDrive = false;
-        liftAtStart = false;
+        liftAtHeight = true;
         manualShoot = false;
         microState = MicroState.Idle;
         macroState = MacroState.Idle;
@@ -186,14 +186,14 @@ public class Drive extends OpMode {
         liftHeight = liftDistanceSensor.getDistance(DistanceUnit.CM); //Get distance from liftSensor
 
         //Get lift to start position before giving up control
-        if (!liftAtStart) {
-            if (liftHeight <= startLiftHeight - 0.2)
+        if (!liftAtHeight) {
+            if (liftHeight <= targetLiftHeight - 0.2)
                 liftMotor.setPower(-1);
-            else if (startLiftHeight + 0.2 <= liftHeight)
+            else if (targetLiftHeight + 0.2 <= liftHeight)
                 liftMotor.setPower(1);
             else {
                 liftMotor.setPower(0);
-                liftAtStart = true;
+                liftAtHeight = true;
             }
         }
         else {
@@ -209,7 +209,7 @@ public class Drive extends OpMode {
                 liftLock.setPosition(0);
         }
         if (gamepad2.left_stick_button)
-            liftAtStart = false;
+            liftAtHeight = false;
 
         switch (microState) {
             case Idle:
