@@ -25,7 +25,7 @@ DONE: Start lift at height of 33
 TODO-DONE: Adjust servo open time in micro pol system
 TODO: Fix buttons for gamepad2
 TODO: Long press (~300ms) for lift start height
-TODO: Change buttons from A/B to something else.
+DONE: Change buttons from A/B to something else. Micro -> dpad_right , Macro -> double bumper
  */
 
 @TeleOp(name="Drive", group="Drive")
@@ -41,8 +41,32 @@ public class Drive extends OpMode {
     private final double lowerLiftBound = 9;
     private final double upperLiftBound = 36.3;
     private final double liftLockHeight = 20.9;
+    private final double lengthForLongPress = 300; //Time in milliseconds
     private final double targetLiftHeight = 32;
     private final int ticksForLoad = 1120;
+
+    //Robot Hardware
+
+    //Motors
+    private DcMotorEx rightMotor;
+    private DcMotorEx forRight;
+    private DcMotorEx leftMotor;
+    private DcMotorEx forLeft;
+    private DcMotor intakeMotor;
+    private DcMotorEx microPolMotor;
+    private DcMotorEx macroPolMotor;
+    private DcMotorEx liftMotor;
+
+    //Servos
+    private Servo liftLock;
+    private Servo macroTrigger;
+    private Servo microGate;
+
+    //Sensors
+    private Rev2mDistanceSensor liftDistanceSensor;
+    private ColorSensor microColorSensor;
+    private DistanceSensor microDistanceSensor;
+    private TouchSensor macroMagLimit;
 
     //Variables
     private double driveSpeed;
@@ -57,35 +81,20 @@ public class Drive extends OpMode {
     private MicroState microState;
     private MacroState macroState;
 
-    //Robot Hardware
-    private DcMotorEx rightMotor;
-    private DcMotorEx forRight;
-    private DcMotorEx leftMotor;
-    private DcMotorEx forLeft;
-    private DcMotor intakeMotor;
-    private DcMotorEx microPolMotor;
-    private DcMotorEx macroPolMotor;
-    private DcMotorEx liftMotor;
-    private Servo liftLock;
-    private Servo macroTrigger;
-    private Servo microGate;
-
+    //Runtimes
     private ElapsedTime microRuntime = new ElapsedTime();
     private ElapsedTime macroRuntime = new ElapsedTime();
 
-    private Rev2mDistanceSensor liftDistanceSensor;
-    private ColorSensor microColorSensor;
-    private DistanceSensor microDistanceSensor;
-    private TouchSensor macroMagLimit;
-
     //Telemetry
-    Telemetry.Item teleSpeed;
-    Telemetry.Item teleMicroState;
-    Telemetry.Item teleMacroState;
-    Telemetry.Item teleLiftHeight;
+    private Telemetry.Item teleSpeed;
+    private Telemetry.Item teleMicroState;
+    private Telemetry.Item teleMacroState;
+    private Telemetry.Item teleLiftHeight;
+    private Telemetry.Item teleLiftLock;
 
     @Override
     public void init() {
+        //Initialize variables
         driveState = DriveState.Normal;
         driveSpeed = normalSpeed;
         constIntake = false;
@@ -112,12 +121,13 @@ public class Drive extends OpMode {
         microColorSensor = hardwareMap.get(ColorSensor.class, "MicroColorSensor");
         microDistanceSensor = hardwareMap.get(DistanceSensor.class, "MicroColorSensor");
         macroMagLimit = hardwareMap.get(TouchSensor.class, "MacroMagLimit");
-        //TODO: Add reverses
+        //Reverse the needed motors
         rightMotor.setDirection(DcMotor.Direction.REVERSE);
         forRight.setDirection(DcMotor.Direction.REVERSE);
         microPolMotor.setDirection(DcMotor.Direction.REVERSE);
         intakeMotor.setDirection(DcMotor.Direction.REVERSE);
-        //TODO: Add brake button
+        liftMotor.setDirection(DcMotor.Direction.REVERSE);
+        //Set all motors to stop without power
         rightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         forRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -127,6 +137,7 @@ public class Drive extends OpMode {
         macroPolMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        //Initialize encoders for motors that use encoders
         microPolMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         macroPolMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         microPolMotor.setTargetPosition(0);
@@ -136,8 +147,8 @@ public class Drive extends OpMode {
         microPolMotor.setPower(1);
         macroPolMotor.setPower(1);
         //TODO: Test default targetPositionTolerance
-        microPolMotor.setTargetPositionTolerance(4);
-        macroPolMotor.setTargetPositionTolerance(4);
+        microPolMotor.setTargetPositionTolerance(8);
+        macroPolMotor.setTargetPositionTolerance(8);
 
         //Initialize Servos
         liftLock.setPosition(0);
@@ -148,6 +159,7 @@ public class Drive extends OpMode {
         teleMicroState = telemetry.addData("Micro Pol State", microState);
         teleMacroState = telemetry.addData("Macro Pol State", macroState);
         teleLiftHeight = telemetry.addData("Lift Height", liftHeight);
+        teleLiftLock = telemetry.addData("Lift Lock State", (liftLock.getPosition() == 1) ? "Locked" : "Unlocked");
     }
 
     @Override
@@ -188,9 +200,9 @@ public class Drive extends OpMode {
         //Get lift to start position before giving up control
         if (!liftAtHeight) {
             if (liftHeight <= targetLiftHeight - 0.2)
-                liftMotor.setPower(-1);
-            else if (targetLiftHeight + 0.2 <= liftHeight)
                 liftMotor.setPower(1);
+            else if (targetLiftHeight + 0.2 <= liftHeight)
+                liftMotor.setPower(-1);
             else {
                 liftMotor.setPower(0);
                 liftAtHeight = true;
@@ -200,7 +212,7 @@ public class Drive extends OpMode {
             //Limit lift to the lift's bounds
             if ((lowerLiftBound < liftHeight && gamepad2.left_stick_y > 0) ||
                     (liftHeight < upperLiftBound && gamepad2.left_stick_y < 0)) //TODO: Correct sticks and optimize.
-                liftMotor.setPower(gamepad2.left_stick_y); //TODO: invert gamepad stick, correct motor direction.
+                liftMotor.setPower(-gamepad2.left_stick_y);
             else liftMotor.setPower(0);
             //Let the lift locking servo extend when the lift is at the proper height
             if (liftHeight < liftLockHeight && gamepad2.left_trigger)
@@ -213,7 +225,7 @@ public class Drive extends OpMode {
 
         switch (microState) {
             case Idle:
-                if (gamepad2.a)
+                if (gamepad2.dpad_right)
                     microState = MicroState.StartFeed;
                 break;
             case StartFeed:
@@ -250,8 +262,6 @@ public class Drive extends OpMode {
 
         switch (macroState) {
             case Idle:
-//                if (gamepad2.a)
-//                    macroState = MacroState.StartLoading;
                 macroState = (gamepad2.y) ? MacroState.StartLoading : macroState;
                 break;
             case StartLoading:
@@ -274,7 +284,7 @@ public class Drive extends OpMode {
                 }
                 break;
             case LockedAndLoaded:
-                if ((gamepad2.b) && macroPolMotor.getCurrentPosition() < 15)
+                if ((gamepad2.right_bumper && gamepad2.left_bumper) && macroPolMotor.getCurrentPosition() < 15)
                     macroState = MacroState.Shoot;
                 break;
             case Shoot:
@@ -283,17 +293,6 @@ public class Drive extends OpMode {
                 break;
             default: macroState = MacroState.Idle; break;
         }
-
-        /*if (macroMagLimit.isPressed())
-            macroTrigger.setPosition(0.7);
-        if (gamepad2.left_stick_button && gamepad2.right_stick_button)
-            macroTrigger.setPosition(0);*/
-
-        /*if (gamepad2.right_bumper)
-            macroPolMotor.setPower(1);
-        else if (gamepad2.left_bumper)
-            macroPolMotor.setPower(-1);
-        else macroPolMotor.setPower(0);*/
 
         if (gamepad2.dpad_down)
             microGate.setPosition(0.1);
@@ -313,6 +312,7 @@ public class Drive extends OpMode {
         teleMicroState.setValue(microState);
         teleMacroState.setValue(macroState);
         teleLiftHeight.setValue(liftHeight);
+        teleLiftLock.setValue((liftLock.getPosition() == 1) ? "Locked" : "Unlocked");
         telemetry.update();
     }
 
