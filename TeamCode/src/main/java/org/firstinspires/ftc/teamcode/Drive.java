@@ -73,17 +73,19 @@ public class Drive extends OpMode {
     private double liftHeight;
     private boolean constIntake;
     private boolean straightDrive;
-    private boolean liftAtHeight;
+    private boolean liftButtonPressed;
     private boolean manualShoot;
 
     //Robot States
     private DriveState driveState;
     private MicroState microState;
     private MacroState macroState;
+    private AutoLiftState autoLiftState;
 
     //Runtimes
     private ElapsedTime microRuntime = new ElapsedTime();
     private ElapsedTime macroRuntime = new ElapsedTime();
+    private ElapsedTime longPressRuntime = new ElapsedTime();
 
     //Telemetry
     private Telemetry.Item teleSpeed;
@@ -99,10 +101,11 @@ public class Drive extends OpMode {
         driveSpeed = normalSpeed;
         constIntake = false;
         straightDrive = false;
-        liftAtHeight = true;
+        liftButtonPressed = false;
         manualShoot = false;
         microState = MicroState.Idle;
         macroState = MacroState.Idle;
+        autoLiftState = AutoLiftState.Manual;
 
         //Initialize all motors and Servos
         rightMotor = hardwareMap.get(DcMotorEx.class, "RightMotor");
@@ -198,14 +201,50 @@ public class Drive extends OpMode {
         liftHeight = liftDistanceSensor.getDistance(DistanceUnit.CM); //Get distance from liftSensor
 
         //Get lift to start position before giving up control
-        if (!liftAtHeight) {
+        switch (autoLiftState) {
+            case Manual:
+                //Limit lift to the lift's bounds
+                if ((lowerLiftBound < liftHeight && gamepad2.left_stick_y > 0) ||
+                        (liftHeight < upperLiftBound && gamepad2.left_stick_y < 0)) //TODO: Correct sticks and optimize.
+                    liftMotor.setPower(-gamepad2.left_stick_y);
+                else liftMotor.setPower(0);
+                //Let the lift locking servo extend when the lift is at the proper height
+                if (liftHeight < liftLockHeight && gamepad2.left_trigger)
+                    liftLock.setPosition(1);
+                if (gamepad2.x)
+                    liftLock.setPosition(0);
+
+                //TODO: Optimize
+                if (gamepad2.left_stick_button && !liftButtonPressed) {
+                    longPressRuntime.reset();
+                    liftButtonPressed = true;
+                }
+                else if (gamepad2.left_stick_button && 300 < longPressRuntime.milliseconds())
+                    autoLiftState = AutoLiftState.Homing;
+                else if (!gamepad2.left_stick_button)
+                    liftButtonPressed = false;
+//                liftButtonPressed = gamepad2.left_stick_button || liftButtonPressed;
+                break;
+            case Homing:
+                if (liftHeight <= targetLiftHeight - 0.2)
+                    liftMotor.setPower(1);
+                else if (targetLiftHeight + 0.2 <= liftHeight)
+                    liftMotor.setPower(-1);
+                else {
+                    liftMotor.setPower(0);
+                    liftButtonPressed = false;
+                    autoLiftState = AutoLiftState.Manual;
+                }
+                break;
+        }
+        if (!liftButtonPressed) {
             if (liftHeight <= targetLiftHeight - 0.2)
                 liftMotor.setPower(1);
             else if (targetLiftHeight + 0.2 <= liftHeight)
                 liftMotor.setPower(-1);
             else {
                 liftMotor.setPower(0);
-                liftAtHeight = true;
+                liftButtonPressed = true;
             }
         }
         else {
@@ -221,7 +260,7 @@ public class Drive extends OpMode {
                 liftLock.setPosition(0);
         }
         if (gamepad2.left_stick_button)
-            liftAtHeight = false;
+            liftButtonPressed = false;
 
         switch (microState) {
             case Idle:
@@ -359,6 +398,11 @@ public class Drive extends OpMode {
         Locked,
         LockedAndLoaded,
         Shoot
+    }
+
+    private enum AutoLiftState {
+        Manual,
+        Homing
     }
 }
 
