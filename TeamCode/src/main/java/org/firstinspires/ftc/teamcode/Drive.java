@@ -230,7 +230,6 @@ public class Drive extends OpMode {
                     liftState = AutoLiftState.Homing;
                 else if (!gamepad2.left_stick_button)
                     liftButtonPressed = false;
-//                liftButtonPressed = gamepad2.left_stick_button || liftButtonPressed;
                 break;
             case Homing:
                 //Home the lift to the target height
@@ -279,7 +278,7 @@ public class Drive extends OpMode {
             case StartShoot:
                 if (checkColor(microColorSensor, rgbaUpper, rgbaLower) ||
                         microDistanceSensor.getDistance(DistanceUnit.CM) <= microMaxDistance) {
-                    microPolMotor.setTargetPosition(microPolMotor.getTargetPosition() + ticksPerMicroRev); //Change to target position to allow feeding before shooting has finished
+                    microPolMotor.setTargetPosition(microPolMotor.getTargetPosition() + ticksPerMicroRev);
                     microState = MicroState.Shooting;
                 }
                 else if (3000 < microRuntime.milliseconds())
