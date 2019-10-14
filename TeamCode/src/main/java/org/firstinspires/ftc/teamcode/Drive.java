@@ -22,9 +22,9 @@ DONE: Automatic servo for Micro
 DONE: Automatic shooting for Macro
 TODO: Possible small changes to syntax for Macro
 DONE: Start lift at height of 33
-TODO-DONE: Adjust servo open time in micro pol system
-TODO: Fix buttons for gamepad2
-TODO: Long press (~300ms) for lift start height
+DONE: Adjust servo open time in micro pol system
+DONE: Fix buttons for gamepad2
+DONE: Long press (~300ms) for lift start height
 DONE: Change buttons from A/B to something else. Micro -> dpad_right , Macro -> double bumper
  */
 
@@ -43,7 +43,7 @@ public class Drive extends OpMode {
     private final double liftLockHeight = 20.9;
     private final double lengthForLongPress = 300; //Time in milliseconds
     private final double targetLiftHeight = 32;
-    private final int ticksForLoad = 1120;
+    private final int ticksForLoad = 1470;
 
     //Robot Hardware
 
@@ -80,7 +80,7 @@ public class Drive extends OpMode {
     private DriveState driveState;
     private MicroState microState;
     private MacroState macroState;
-    private AutoLiftState autoLiftState;
+    private AutoLiftState liftState;
 
     //Runtimes
     private ElapsedTime microRuntime = new ElapsedTime();
@@ -105,7 +105,7 @@ public class Drive extends OpMode {
         manualShoot = false;
         microState = MicroState.Idle;
         macroState = MacroState.Idle;
-        autoLiftState = AutoLiftState.Manual;
+        liftState = AutoLiftState.Manual;
 
         //Initialize all motors and Servos
         rightMotor = hardwareMap.get(DcMotorEx.class, "RightMotor");
@@ -173,12 +173,16 @@ public class Drive extends OpMode {
 
     @Override
     public void loop() {
+        //Enables using Slow/Fast mode when the appropriate button is clicked
+        //This is done with a state machine to make it easy to read and to make telemetry easier
+        //This may be changed in the future
         if (gamepad1.right_trigger)
             driveState = DriveState.Slow;
         else if (gamepad1.left_trigger)
             driveState = DriveState.Fast;
         else driveState = DriveState.Normal;
 
+        //Enables straight drive mode
         if (gamepad1.left_bumper)
             straightDrive = true;
         else straightDrive = false;
@@ -187,9 +191,9 @@ public class Drive extends OpMode {
         driveSpeed = (driveState == DriveState.Slow) ? slowSpeed :
                         (driveState == DriveState.Fast) ? fastSpeed : normalSpeed;
         if (straightDrive)
-            setMotor(-gamepad1.left_stick_y, -gamepad1.left_stick_y, driveSpeed);  //Temp code
+            setMotor(-gamepad1.left_stick_y, -gamepad1.left_stick_y, driveSpeed);  //Will be changed
         else
-            setMotor(-gamepad1.left_stick_y, -gamepad1.right_stick_y, driveSpeed); //Temp code
+            setMotor(-gamepad1.left_stick_y, -gamepad1.right_stick_y, driveSpeed); //Will be changed
 
         //Activate constant intake if right_stick_y is bigger than 0.8
         constIntake = (0.9 < gamepad2.right_stick_y && gamepad2.right_stick_button) || constIntake;
@@ -201,11 +205,14 @@ public class Drive extends OpMode {
         liftHeight = liftDistanceSensor.getDistance(DistanceUnit.CM); //Get distance from liftSensor
 
         //Get lift to start position before giving up control
-        switch (autoLiftState) {
+        switch (liftState) {
             case Manual:
+                //Switch to manual override, overriding the distance sensor limit
+                if (gamepad2.a && gamepad2.b)
+                    liftState = AutoLiftState.ManualOverride;
                 //Limit lift to the lift's bounds
                 if ((lowerLiftBound < liftHeight && gamepad2.left_stick_y > 0) ||
-                        (liftHeight < upperLiftBound && gamepad2.left_stick_y < 0)) //TODO: Correct sticks and optimize.
+                        (liftHeight < upperLiftBound && gamepad2.left_stick_y < 0))
                     liftMotor.setPower(-gamepad2.left_stick_y);
                 else liftMotor.setPower(0);
                 //Let the lift locking servo extend when the lift is at the proper height
@@ -220,12 +227,13 @@ public class Drive extends OpMode {
                     liftButtonPressed = true;
                 }
                 else if (gamepad2.left_stick_button && 300 < longPressRuntime.milliseconds())
-                    autoLiftState = AutoLiftState.Homing;
+                    liftState = AutoLiftState.Homing;
                 else if (!gamepad2.left_stick_button)
                     liftButtonPressed = false;
 //                liftButtonPressed = gamepad2.left_stick_button || liftButtonPressed;
                 break;
             case Homing:
+                //Home the lift to the target height
                 if (liftHeight <= targetLiftHeight - 0.2)
                     liftMotor.setPower(1);
                 else if (targetLiftHeight + 0.2 <= liftHeight)
@@ -233,35 +241,24 @@ public class Drive extends OpMode {
                 else {
                     liftMotor.setPower(0);
                     liftButtonPressed = false;
-                    autoLiftState = AutoLiftState.Manual;
+                    liftState = AutoLiftState.Manual;
                 }
                 break;
-        }
-        if (!liftButtonPressed) {
-            if (liftHeight <= targetLiftHeight - 0.2)
-                liftMotor.setPower(1);
-            else if (targetLiftHeight + 0.2 <= liftHeight)
-                liftMotor.setPower(-1);
-            else {
-                liftMotor.setPower(0);
-                liftButtonPressed = true;
-            }
-        }
-        else {
-            //Limit lift to the lift's bounds
-            if ((lowerLiftBound < liftHeight && gamepad2.left_stick_y > 0) ||
-                    (liftHeight < upperLiftBound && gamepad2.left_stick_y < 0)) //TODO: Correct sticks and optimize.
+            case ManualOverride:
+                if ((!gamepad2.a) || (!gamepad2.b))
+                    liftState = AutoLiftState.Manual;
+                //Limit lift without bounds, be careful
                 liftMotor.setPower(-gamepad2.left_stick_y);
-            else liftMotor.setPower(0);
-            //Let the lift locking servo extend when the lift is at the proper height
-            if (liftHeight < liftLockHeight && gamepad2.left_trigger)
-                liftLock.setPosition(1);
-            if (gamepad2.x)
-                liftLock.setPosition(0);
+                //Control locking servo regardless of height
+                if (gamepad2.left_trigger)
+                    liftLock.setPosition(1);
+                if (gamepad2.x)
+                    liftLock.setPosition(0);
         }
-        if (gamepad2.left_stick_button)
-            liftButtonPressed = false;
 
+        //Micro pollutant automated system
+        /* It goes through: Checking for controller input -> Feeding a pollutant -> Waiting for the it to arrive
+            -> Shooting it -> Precisely timing the next feed to maximize shoot speed */
         switch (microState) {
             case Idle:
                 if (gamepad2.dpad_right)
@@ -297,18 +294,19 @@ public class Drive extends OpMode {
             default: microState = MicroState.Idle; break;
         }
 
-        //TODO: Check position of macroMotor when shooting.
-
+        //Macro pollutant automated system
+        /* It goes through: Checking for controller input -> Loading the catapult -> Locking the trigger
+            Releasing the rope -> Waiting for another button input to shoot pollutant -> Back to start*/
         switch (macroState) {
             case Idle:
                 macroState = (gamepad2.y) ? MacroState.StartLoading : macroState;
                 break;
             case StartLoading:
-                macroPolMotor.setTargetPosition(ticksForLoad + 250);
+                macroPolMotor.setTargetPosition(ticksForLoad);
                 macroState = MacroState.Loading;
                 break;
             case Loading:
-                if (ticksForLoad < macroPolMotor.getCurrentPosition())
+                if (ticksForLoad - 20 < macroPolMotor.getCurrentPosition())
                     macroState = MacroState.StartLock;
                 break;
             case StartLock:
@@ -317,12 +315,14 @@ public class Drive extends OpMode {
                 macroRuntime.reset();
                 break;
             case Locked:
+                //Waits till the servo is closed for sure before releasing rope
                 if (700 < macroRuntime.milliseconds()) {
                     macroPolMotor.setTargetPosition(0);
                     macroState = MacroState.LockedAndLoaded;
                 }
                 break;
             case LockedAndLoaded:
+                //Shoot only once the rope is completely unloaded
                 if ((gamepad2.right_bumper && gamepad2.left_bumper) && macroPolMotor.getCurrentPosition() < 15)
                     macroState = MacroState.Shoot;
                 break;
@@ -333,13 +333,16 @@ public class Drive extends OpMode {
             default: macroState = MacroState.Idle; break;
         }
 
+        //Feed micro pollutants manually
         if (gamepad2.dpad_down)
             microGate.setPosition(0.1);
         else if (gamepad2.dpad_up)
             microGate.setPosition(0.26);
 
+        //Shoot micro pollutants manually
         if (gamepad2.right_trigger && !manualShoot) {
             microPolMotor.setTargetPosition(microPolMotor.getTargetPosition() + ticksPerMicroRev);
+            manualShoot = true;
         }
         else if (manualShoot){
             if (microPolMotor.getTargetPosition() - 10 < microPolMotor.getCurrentPosition()) {
@@ -347,6 +350,7 @@ public class Drive extends OpMode {
             }
         }
 
+        //Update telemetry values
         teleSpeed.setValue(driveSpeed);
         teleMicroState.setValue(microState);
         teleMacroState.setValue(macroState);
@@ -355,6 +359,7 @@ public class Drive extends OpMode {
         telemetry.update();
     }
 
+    //Function for checking if the the color from the colorSensor is within the bounds rgbaUpper and rgbaLower
     public static boolean checkColor(ColorSensor colorSensor, int[] rgbaUpper, int[] rgbaLower) {
         int[] rgba = new int[] {colorSensor.red(), colorSensor.green(), colorSensor.blue(), colorSensor.alpha()};
         boolean compareResults = true;
@@ -402,7 +407,8 @@ public class Drive extends OpMode {
 
     private enum AutoLiftState {
         Manual,
-        Homing
+        Homing,
+        ManualOverride
     }
 }
 
