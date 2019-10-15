@@ -305,7 +305,7 @@ public class Drive extends OpMode {
                 macroState = MacroState.Loading;
                 break;
             case Loading:
-                if (ticksForLoad - 20 < macroPolMotor.getCurrentPosition())
+                if (ticksForLoad - 180 < macroPolMotor.getCurrentPosition())
                     macroState = MacroState.StartLock;
                 break;
             case StartLock:
@@ -322,7 +322,7 @@ public class Drive extends OpMode {
                 break;
             case LockedAndLoaded:
                 //Shoot only once the rope is completely unloaded
-                if ((gamepad2.right_bumper && gamepad2.left_bumper) && macroPolMotor.getCurrentPosition() < 15)
+                if ((gamepad2.right_bumper && gamepad2.left_bumper) && macroPolMotor.getCurrentPosition() < 100)
                     macroState = MacroState.Shoot;
                 break;
             case Shoot:
