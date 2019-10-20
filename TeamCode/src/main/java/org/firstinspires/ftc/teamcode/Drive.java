@@ -189,7 +189,7 @@ public class Drive extends OpMode {
 
         //Sets Drive Speed Based on driveState
         driveSpeed = (driveState == DriveState.Slow) ? slowSpeed :
-                        (driveState == DriveState.Fast) ? fastSpeed : normalSpeed;
+                (driveState == DriveState.Fast) ? fastSpeed : normalSpeed;
         if (straightDrive)
             setMotor(-gamepad1.left_stick_y, -gamepad1.left_stick_y, driveSpeed);  //Will be changed
         else
@@ -260,16 +260,16 @@ public class Drive extends OpMode {
             -> Shooting it -> Precisely timing the next feed to maximize shoot speed */
         switch (microState) {
             case Idle:
-                if (gamepad2.dpad_right)
+                if (gamepad2.dpad_left)
                     microState = MicroState.StartFeed;
                 break;
             case StartFeed:
-                microGate.setPosition(0.26);
+                microGate.setPosition(0.27);
                 microState = MicroState.Feeding;
                 microRuntime.reset();
                 break;
             case Feeding:
-                if (305 < microRuntime.milliseconds()) {
+                if (325 < microRuntime.milliseconds()) {
                     microGate.setPosition(0.1);
                     microState = MicroState.StartShoot;
                     microRuntime.reset();
@@ -322,7 +322,7 @@ public class Drive extends OpMode {
                 break;
             case LockedAndLoaded:
                 //Shoot only once the rope is completely unloaded
-                if ((gamepad2.right_bumper && gamepad2.left_bumper) && macroPolMotor.getCurrentPosition() < 100)
+                if ((gamepad2.right_bumper && gamepad2.b) && macroPolMotor.getCurrentPosition() < 100)
                     macroState = MacroState.Shoot;
                 break;
             case Shoot:
@@ -410,4 +410,3 @@ public class Drive extends OpMode {
         ManualOverride
     }
 }
-
