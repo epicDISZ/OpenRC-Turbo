@@ -260,7 +260,7 @@ public class Drive extends OpMode {
             -> Shooting it -> Precisely timing the next feed to maximize shoot speed */
         switch (microState) {
             case Idle:
-                if (gamepad2.dpad_left)
+                if (gamepad2.left_bumper)
                     microState = MicroState.StartFeed;
                 break;
             case StartFeed:
